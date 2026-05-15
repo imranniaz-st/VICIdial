@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  vicidial:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vicidial-server
+    hostname: vicidial
+    ports:
+      # Web Interface
+      - "80:80"
+      - "443:443"
+      # Asterisk SIP
+      - "5060:5060"
+      - "5060:5060/udp"
+      # Asterisk RTP
+      - "10000-20000:10000-20000/udp"
+      # Asterisk IAX
+      - "4569:4569/udp"
+      # MariaDB
+      - "3306:3306"
+    volumes:
+      # Persist database
+      - vicidial_db:/var/lib/mysql
+      # Persist Asterisk config
+      - vicidial_asterisk:/etc/asterisk
+      # Persist VICIdial web files
+      - vicidial_www:/var/www/html
+      # Persist logs
+      - vicidial_logs:/var/log
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+      - MYSQL_ROOT_PASSWORD=VICIdial123!
+      - VICIDIAL_DB_USER=vicidial
+      - VICIDIAL_DB_PASS=vicidial
+    restart: unless-stopped
+    # Uncomment for privileged mode if needed for audio devices
+    # privileged: true
+    # devices:
+    #   - /dev/snd:/dev/snd
+
+volumes:
+  vicidial_db:
+    driver: local
+  vicidial_asterisk:
+    driver: local
+  vicidial_www:
+    driver: local
+  vicidial_logs:
+    driver: local
+
+networks:
+  default:
+    name: vicidial-network
+    driver: bridge
