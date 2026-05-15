@@ -104,8 +104,8 @@ RUN wget -q http://downloads.asterisk.org/pub/telephony/asterisk/asterisk-16-cur
     ./configure \
     --with-pjproject-bundled \
     --with-jansson-bundled \
-    --with-bluetooth \
-    --with-ssl \
+    # --with-bluetooth \
+    # --with-ssl \
     --with-srtp \
     && make menuselect.makeopts && \
     ./menuselect/menuselect \
