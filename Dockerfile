@@ -7,7 +7,7 @@ LABEL description="VICIdial Complete Installation on Ubuntu 22.04"
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
-ENV ASTERISK_VERSION=16.30.1
+ENV ASTERISK_VERSION=18.30.1
 ENV VICIDIAL_VERSION=latest
 
 # Install system dependencies
@@ -98,8 +98,8 @@ RUN service mariadb start && \
 
 # Build and install Asterisk
 WORKDIR /tmp
-RUN wget -q http://downloads.asterisk.org/pub/telephony/asterisk/asterisk-16-current.tar.gz && \
-    tar -xzf asterisk-16-current.tar.gz && \
+RUN wget -q http://downloads.asterisk.org/pub/telephony/asterisk/asterisk-18-current.tar.gz && \
+    tar -xzf asterisk-18-current.tar.gz && \
     cd asterisk-* && \
     ./configure \
     --with-pjproject-bundled \
