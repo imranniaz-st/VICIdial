@@ -235,7 +235,7 @@ echo "======================================"
 tail -f /var/log/asterisk/full
 EOF
 
-chmod +x /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Create a health check script
 RUN cat > /health_check.sh <<'EOF'
@@ -247,7 +247,7 @@ service mariadb status > /dev/null 2>&1 && \
 echo "OK" && exit 0 || exit 1
 EOF
 
-chmod +x /health_check.sh
+RUN chmod +x /health_check.sh
 
 # Expose necessary ports
 # HTTP
