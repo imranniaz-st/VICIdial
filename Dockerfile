@@ -100,25 +100,24 @@ RUN service mariadb start && \
 WORKDIR /tmp
 RUN wget -q http://downloads.asterisk.org/pub/telephony/asterisk/asterisk-18-current.tar.gz && \
     tar -xzf asterisk-18-current.tar.gz && \
-    cd asterisk-* && \
+    ls -la && \
+    cd $(tar -tzf asterisk-18-current.tar.gz | head -1 | cut -d/ -f1) && \
     ./configure \
-    --with-pjproject-bundled \
-    --with-jansson-bundled \
-    # --with-bluetooth \
-    # --with-ssl \
-    --with-srtp \
-    && make menuselect.makeopts && \
+        --with-pjproject-bundled \
+        --with-jansson-bundled \
+        --with-srtp && \
+    make menuselect.makeopts && \
     ./menuselect/menuselect \
-    --enable-category MENUSELECT_ADDONS \
-    --enable-category MENUSELECT_APPS \
-    --enable-category MENUSELECT_CHANNELS \
-    --enable-category MENUSELECT_CODECS \
-    --enable-category MENUSELECT_FORMATS \
-    --enable-category MENUSELECT_FUNCS \
-    --enable-category MENUSELECT_TESTS \
-    --enable-category MENUSELECT_UTILS \
-    --enable-category MENUSELECT_RES \
-    menuselect.makeopts && \
+        --enable-category MENUSELECT_ADDONS \
+        --enable-category MENUSELECT_APPS \
+        --enable-category MENUSELECT_CHANNELS \
+        --enable-category MENUSELECT_CODECS \
+        --enable-category MENUSELECT_FORMATS \
+        --enable-category MENUSELECT_FUNCS \
+        --enable-category MENUSELECT_TESTS \
+        --enable-category MENUSELECT_UTILS \
+        --enable-category MENUSELECT_RES \
+        menuselect.makeopts && \
     make && \
     make install && \
     make samples && \
