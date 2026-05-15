@@ -1,0 +1,79 @@
+# Git ignore file for VICIdial Docker project
+
+# Docker
+.docker/
+docker-compose.override.yml
+.env
+.env.local
+.env.*.local
+
+# Volumes and data
+vicidial_db/
+vicidial_asterisk/
+vicidial_www/
+vicidial_logs/
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.settings
+.sublime-project
+.sublime-workspace
+*.iml
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+temp/
+tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+*.exe
+*.dll
+*.so
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+venv/
+env/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Backups
+*.sql
+backup/
+backups/
+*.tar.gz
+*.zip
+
+# System
+.env
+.env.local
+*.pid
+*.sock
+
+# Build artifacts
+Makefile.local
+config.local.php

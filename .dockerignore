@@ -1,0 +1,88 @@
+# Docker build context ignore file
+# These files will not be included in the Docker image build
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose*.yml
+
+# Documentation
+*.md
+*.markdown
+LICENSE
+CHANGELOG
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.settings
+.sublime-project
+.sublime-workspace
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.pyc
+*.pyo
+__pycache__
+build/
+dist/
+*.egg-info/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Python
+*.egg
+venv/
+env/
+.python-version
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+temp/
+tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup
+*.backup
+*.bak
+*~
+
+# Archives
+*.tar
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# IDE cache
+.cache
+.pytest_cache
+.tox
+
+# Package managers
+yarn.lock
+package-lock.json
