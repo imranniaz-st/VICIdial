@@ -1,4 +1,3 @@
-# VICIdial + Asterisk 18 Stable Docker Image
 FROM ubuntu:22.04
 
 LABEL maintainer="VICIdial"
@@ -37,12 +36,12 @@ RUN useradd -m -s /bin/bash vicidial && \
     chown -R vicidial:vicidial /home/vicidial
 
 # =========================
-# 4. APACHE CONFIG
+# 4. APACHE MODULES
 # =========================
 RUN a2enmod rewrite ssl proxy proxy_http proxy_wstunnel
 
 # =========================
-# 5. ASTERISK DOWNLOAD (CACHED)
+# 5. DOWNLOAD ASTERISK
 # =========================
 WORKDIR /tmp
 
@@ -55,29 +54,23 @@ RUN wget -O asterisk.tar.gz \
 RUN tar -xzf asterisk.tar.gz && rm asterisk.tar.gz
 
 # =========================
-# 7. CONFIGURE ASTERISK (CACHED LAYER)
+# 7. BUILD ASTERISK (FIXED PATH - NO WILDCARD)
 # =========================
-WORKDIR /tmp/asterisk-*
-
-RUN ./configure \
-    --with-pjproject-bundled \
-    --with-jansson-bundled \
-    --with-srtp
-
-RUN make menuselect.makeopts
-
-# =========================
-# 8. BUILD ASTERISK (ONLY THIS REBUILDS ON ERROR)
-# =========================
-RUN make -j$(nproc)
-
-RUN make install && \
-    make samples && \
-    make config && \
+RUN set -eux; \
+    cd /tmp/asterisk-${ASTERISK_VERSION}; \
+    ./configure \
+        --with-pjproject-bundled \
+        --with-jansson-bundled \
+        --with-srtp; \
+    make menuselect.makeopts; \
+    make -j$(nproc); \
+    make install; \
+    make samples; \
+    make config; \
     ldconfig
 
 # =========================
-# 9. VICIDIAL CODE
+# 8. VICIDIAL SOURCE
 # =========================
 WORKDIR /home/vicidial
 
@@ -86,7 +79,7 @@ RUN git clone https://github.com/jmviana/vicidial.git vicidial-src && \
     chown -R www-data:www-data /var/www/html
 
 # =========================
-# 10. APACHE SITE
+# 9. APACHE CONFIG
 # =========================
 RUN cat > /etc/apache2/sites-available/vicidial.conf <<'EOF'
 <VirtualHost *:80>
@@ -106,10 +99,11 @@ EOF
 RUN a2dissite 000-default && a2ensite vicidial
 
 # =========================
-# 11. PHP CONFIG
+# 10. PHP CONFIG (SAFE PATH)
 # =========================
-RUN mkdir -p /etc/php/8.1/apache2/conf.d && \
-    cat > /etc/php/8.1/apache2/conf.d/vicidial.ini <<'EOF'
+RUN PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;') && \
+    mkdir -p /etc/php/${PHP_VER}/apache2/conf.d && \
+    cat > /etc/php/${PHP_VER}/apache2/conf.d/vicidial.ini <<'EOF'
 memory_limit = 512M
 max_execution_time = 300
 upload_max_filesize = 50M
@@ -118,25 +112,24 @@ display_errors = Off
 EOF
 
 # =========================
-# 12. ASTERISK DIRS
+# 11. ASTERISK DIRS
 # =========================
 RUN mkdir -p /etc/asterisk && \
     chown -R root:root /etc/asterisk
 
 # =========================
-# 13. ENTRYPOINT (NO SERVICES START HERE)
+# 12. ENTRYPOINT (DO NOT START SERVICES IN BUILD)
 # =========================
 RUN cat > /entrypoint.sh <<'EOF'
 #!/bin/bash
 
 echo "Starting VICIdial container..."
 
-# Start services (simple mode)
 service mariadb start
 service apache2 start
 service asterisk start
 
-echo "All services started"
+echo "All services started successfully"
 
 tail -f /var/log/asterisk/full
 EOF
@@ -144,12 +137,12 @@ EOF
 RUN chmod +x /entrypoint.sh
 
 # =========================
-# 14. PORTS
+# 13. PORTS
 # =========================
 EXPOSE 80 443 5060 10000-20000/udp 3306
 
 # =========================
-# 15. HEALTHCHECK
+# 14. HEALTHCHECK
 # =========================
 HEALTHCHECK CMD curl -f http://localhost || exit 1
 
