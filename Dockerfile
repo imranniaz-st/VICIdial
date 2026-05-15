@@ -51,8 +51,6 @@ RUN apt-get update && apt-get install -y \
     libvpx-dev \
     libtiff5-dev \
     libspandsp-dev \
-    # SIP and RTP
-    libpjproject-dev \
     # Required utilities
     sudo \
     net-tools \
