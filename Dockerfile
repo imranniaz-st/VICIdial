@@ -1,277 +1,158 @@
-# VICIdial Complete Installation on Ubuntu
-# Multi-stage build for optimization
+# VICIdial + Asterisk 18 Stable Docker Image
 FROM ubuntu:22.04
 
 LABEL maintainer="VICIdial"
-LABEL description="VICIdial Complete Installation on Ubuntu 22.04"
-
-# Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
-ENV ASTERISK_VERSION=18.30.1
-ENV VICIDIAL_VERSION=latest
+ENV ASTERISK_VERSION=18.26.4
 
-# Install system dependencies
+# =========================
+# 1. SYSTEM DEPENDENCIES
+# =========================
 RUN apt-get update && apt-get install -y \
-    # Development tools
-    build-essential \
-    git \
-    wget \
-    curl \
-    vim \
-    nano \
-    htop \
-    tmux \
-    # Web server and PHP
-    apache2 \
-    apache2-dev \
-    php \
-    php-mysql \
-    php-cli \
-    php-common \
-    php-curl \
-    php-gd \
-    php-json \
-    php-mbstring \
-    libapache2-mod-php \
-    # Database
-    mariadb-server \
-    mariadb-client \
-    # Required libraries for Asterisk
+    build-essential git wget curl vim nano htop tmux \
     linux-headers-generic \
-    linux-image-generic \
-    libncurses5-dev \
-    libssl-dev \
-    libxml2-dev \
-    sqlite3 \
-    libsqlite3-dev \
-    uuid-dev \
-    libjansson-dev \
-    # Audio and codec support
-    libopus-dev \
-    libvpx-dev \
-    libtiff5-dev \
-    libspandsp-dev \
-    # Required utilities
-    sudo \
-    net-tools \
-    telnet \
-    unzip \
-    perl \
-    sox \
-    lame \
-    mpg123 \
-    ffmpeg \
-    flac \
-    # Monitoring and logs
-    rsyslog \
-    logrotate \
-    # Additional requirements
-    subversion \
-    ntp \
-    ntpdate \
-    openssh-server \
-    openssh-client \
-    && apt-get clean \
+    libssl-dev libncurses5-dev libncursesw5-dev \
+    libxml2-dev libsqlite3-dev uuid-dev \
+    libjansson-dev libedit-dev \
+    libsrtp2-dev libopus-dev libogg-dev \
+    sox ffmpeg lame mpg123 flac \
     && rm -rf /var/lib/apt/lists/*
 
-# Create VICIdial user and directories
-RUN useradd -m -d /home/vicidial -s /bin/bash -G audio,dialout vicidial && \
-    mkdir -p /home/vicidial/asterisk && \
-    mkdir -p /home/vicidial/sounds && \
-    mkdir -p /var/log/asterisk && \
-    mkdir -p /var/run/asterisk && \
-    chown -R vicidial:vicidial /home/vicidial && \
-    chown -R vicidial:vicidial /var/log/asterisk && \
-    chown -R vicidial:vicidial /var/run/asterisk
+# =========================
+# 2. WEB + DB STACK
+# =========================
+RUN apt-get update && apt-get install -y \
+    apache2 apache2-dev libapache2-mod-php \
+    php php-cli php-mysql php-curl php-gd php-mbstring \
+    mariadb-server mariadb-client \
+    net-tools unzip perl sudo \
+    && rm -rf /var/lib/apt/lists/*
 
-# Enable Apache modules required for VICIdial
-RUN a2enmod rewrite && \
-    a2enmod ssl && \
-    a2enmod proxy && \
-    a2enmod proxy_http && \
-    a2enmod proxy_wstunnel
+# =========================
+# 3. USER SETUP
+# =========================
+RUN useradd -m -s /bin/bash vicidial && \
+    mkdir -p /home/vicidial/{asterisk,sounds} && \
+    mkdir -p /var/log/asterisk /var/run/asterisk && \
+    chown -R vicidial:vicidial /home/vicidial
 
-# Set MariaDB root password and initialize
-RUN service mariadb start && \
-    mysqladmin -u root password 'VICIdial123!' || true && \
-    service mariadb stop
+# =========================
+# 4. APACHE CONFIG
+# =========================
+RUN a2enmod rewrite ssl proxy proxy_http proxy_wstunnel
 
-# Build and install Asterisk
+# =========================
+# 5. ASTERISK DOWNLOAD (CACHED)
+# =========================
 WORKDIR /tmp
-RUN wget -q http://downloads.asterisk.org/pub/telephony/asterisk/asterisk-18-current.tar.gz && \
-    tar -xzf asterisk-18-current.tar.gz && \
-    ls -la && \
-    cd $(tar -tzf asterisk-18-current.tar.gz | head -1 | cut -d/ -f1) && \
-    ./configure \
-        --with-pjproject-bundled \
-        --with-jansson-bundled \
-        --with-srtp && \
-    make menuselect.makeopts && \
-    ./menuselect/menuselect \
-        --enable-category MENUSELECT_ADDONS \
-        --enable-category MENUSELECT_APPS \
-        --enable-category MENUSELECT_CHANNELS \
-        --enable-category MENUSELECT_CODECS \
-        --enable-category MENUSELECT_FORMATS \
-        --enable-category MENUSELECT_FUNCS \
-        --enable-category MENUSELECT_TESTS \
-        --enable-category MENUSELECT_UTILS \
-        --enable-category MENUSELECT_RES \
-        menuselect.makeopts && \
-    make && \
-    make install && \
+
+RUN wget -O asterisk.tar.gz \
+    http://downloads.asterisk.org/pub/telephony/asterisk/asterisk-${ASTERISK_VERSION}.tar.gz
+
+# =========================
+# 6. EXTRACT
+# =========================
+RUN tar -xzf asterisk.tar.gz && rm asterisk.tar.gz
+
+# =========================
+# 7. CONFIGURE ASTERISK (CACHED LAYER)
+# =========================
+WORKDIR /tmp/asterisk-*
+
+RUN ./configure \
+    --with-pjproject-bundled \
+    --with-jansson-bundled \
+    --with-srtp
+
+RUN make menuselect.makeopts
+
+# =========================
+# 8. BUILD ASTERISK (ONLY THIS REBUILDS ON ERROR)
+# =========================
+RUN make -j$(nproc)
+
+RUN make install && \
     make samples && \
     make config && \
     ldconfig
 
-# Download and install VICIdial
+# =========================
+# 9. VICIDIAL CODE
+# =========================
 WORKDIR /home/vicidial
+
 RUN git clone https://github.com/jmviana/vicidial.git vicidial-src && \
-    cd vicidial-src && \
-    cp -r www/* /var/www/html/ && \
-    mkdir -p /var/www/html/vicidial && \
-    mkdir -p /var/www/html/vicidial_api && \
+    cp -r vicidial-src/www/* /var/www/html/ && \
     chown -R www-data:www-data /var/www/html
 
-# Configure Apache for VICIdial
+# =========================
+# 10. APACHE SITE
+# =========================
 RUN cat > /etc/apache2/sites-available/vicidial.conf <<'EOF'
 <VirtualHost *:80>
     ServerName localhost
-    ServerAdmin admin@vicidial.org
-    
     DocumentRoot /var/www/html
-    
+
     <Directory /var/www/html>
-        Options Indexes FollowSymLinks
         AllowOverride All
         Require all granted
     </Directory>
-    
-    <Directory /var/www/html/vicidial>
-        Options Indexes FollowSymLinks
-        AllowOverride All
-        Require all granted
-    </Directory>
-    
+
     ErrorLog /var/log/apache2/vicidial_error.log
     CustomLog /var/log/apache2/vicidial_access.log combined
 </VirtualHost>
 EOF
 
-RUN a2dissite 000-default && \
-    a2ensite vicidial && \
-    apache2ctl configtest
+RUN a2dissite 000-default && a2ensite vicidial
 
-# Configure PHP for VICIdial
-RUN cat > /etc/php/8.1/apache2/conf.d/vicidial.ini <<'EOF'
+# =========================
+# 11. PHP CONFIG
+# =========================
+RUN mkdir -p /etc/php/8.1/apache2/conf.d && \
+    cat > /etc/php/8.1/apache2/conf.d/vicidial.ini <<'EOF'
 memory_limit = 512M
 max_execution_time = 300
 upload_max_filesize = 50M
 post_max_size = 50M
 display_errors = Off
-error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED
 EOF
 
-# Create Asterisk configuration directory structure
+# =========================
+# 12. ASTERISK DIRS
+# =========================
 RUN mkdir -p /etc/asterisk && \
-    chown -R asterisk:asterisk /etc/asterisk && \
-    chmod -R 750 /etc/asterisk
+    chown -R root:root /etc/asterisk
 
-# Copy sample Asterisk configurations (will be configured by startup script)
-RUN cp -r /etc/asterisk.bak/* /etc/asterisk/ 2>/dev/null || true
-
-# Create startup script
+# =========================
+# 13. ENTRYPOINT (NO SERVICES START HERE)
+# =========================
 RUN cat > /entrypoint.sh <<'EOF'
 #!/bin/bash
-set -e
 
-echo "Starting VICIdial services..."
+echo "Starting VICIdial container..."
 
-# Start MariaDB
-echo "Starting MariaDB..."
+# Start services (simple mode)
 service mariadb start
-sleep 5
-
-# Initialize VICIdial database if not exists
-mysql -u root -p'VICIdial123!' -e "CREATE DATABASE IF NOT EXISTS vicidial CHARACTER SET utf8 COLLATE utf8_general_ci;"
-mysql -u root -p'VICIdial123!' -e "GRANT ALL PRIVILEGES ON vicidial.* TO 'vicidial'@'localhost' IDENTIFIED BY 'vicidial' WITH GRANT OPTION;"
-mysql -u root -p'VICIdial123!' -e "FLUSH PRIVILEGES;"
-
-# Import VICIdial database schema if available
-if [ -f /home/vicidial/vicidial-src/extras/vicidial_db.sql ]; then
-    echo "Importing VICIdial database schema..."
-    mysql -u vicidial -pvicidial vicidial < /home/vicidial/vicidial-src/extras/vicidial_db.sql || true
-fi
-
-# Start Asterisk
-echo "Starting Asterisk..."
-service asterisk start
-sleep 5
-
-# Start Apache
-echo "Starting Apache..."
 service apache2 start
+service asterisk start
 
-# Display service status
-echo "Service Status:"
-service mariadb status || true
-service asterisk status || true
-service apache2 status || true
+echo "All services started"
 
-echo ""
-echo "======================================"
-echo "VICIdial Installation Complete!"
-echo "======================================"
-echo "Web Interface: http://localhost"
-echo "Default credentials: admin / admin"
-echo "MariaDB root password: VICIdial123!"
-echo "VICIdial DB user: vicidial / vicidial"
-echo "======================================"
-
-# Keep container running
 tail -f /var/log/asterisk/full
 EOF
 
 RUN chmod +x /entrypoint.sh
 
-# Create a health check script
-RUN cat > /health_check.sh <<'EOF'
-#!/bin/bash
-# Check if all services are running
-service apache2 status > /dev/null 2>&1 && \
-service asterisk status > /dev/null 2>&1 && \
-service mariadb status > /dev/null 2>&1 && \
-echo "OK" && exit 0 || exit 1
-EOF
+# =========================
+# 14. PORTS
+# =========================
+EXPOSE 80 443 5060 10000-20000/udp 3306
 
-RUN chmod +x /health_check.sh
+# =========================
+# 15. HEALTHCHECK
+# =========================
+HEALTHCHECK CMD curl -f http://localhost || exit 1
 
-# Expose necessary ports
-# HTTP
-EXPOSE 80
-# HTTPS
-EXPOSE 443
-# Asterisk SIP UDP
-EXPOSE 5060/udp
-# Asterisk SIP TCP
-EXPOSE 5060
-# Asterisk RTP (range)
-EXPOSE 10000-20000/udp
-# Asterisk IAX UDP
-EXPOSE 4569/udp
-# MariaDB
-EXPOSE 3306
-
-# Create log directory
-RUN mkdir -p /var/log/asterisk && \
-    chown -R asterisk:asterisk /var/log/asterisk
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD /health_check.sh
-
-# Set working directory
 WORKDIR /home/vicidial
 
-# Run entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
